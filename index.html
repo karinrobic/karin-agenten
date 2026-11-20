@@ -46,16 +46,17 @@
 <body>
 <main>
   <div class="kopf"><img class="k" src="kachel-k.png" alt=""><img class="z" src="drei-zeichen.png" alt=""></div>
-  <h1>Meine Agenten <small style="font-weight:400;font-size:12px;color:#8A6D72">v4</small></h1>
+  <h1>Meine Agenten <small style="font-weight:400;font-size:12px;color:#8A6D72">v5</small></h1>
   <div id="liste"></div>
 </main>
 <div id="ansicht"><div class="leiste"><b id="atitel"></b><button id="azu">Schließen</button></div><pre id="atext"></pre></div>
 <div id="meldung"></div>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <script>
   var AGENTEN = [
     { name:'PA', text:'Dein persönlicher Assistent', zeichen:'✦', unter:[
-      { name:'Morgen-Briefing', text:'Mails, Termine und offene Themen', befehl:'/offene-themen', zeichen:'☀' },
-      { name:'KI-News', text:'Die täglichen Top 10 mit Links', ansehen:'news/aktuell.md', zeichen:'📰' } ] },
+      { name:'Morgen-Briefing', text:'Mails, Termine und offene Themen', befehl:'/offene-themen', ansehen:true, drive:'Morgen-Briefing', zeichen:'☀' },
+      { name:'KI-News', text:'Die täglichen Top 10 mit Links', ansehen:true, drive:'KI-News', zeichen:'📰' } ] },
     { name:'Kommunikation', text:'Mails und Nachrichten', zeichen:'✉', unter:[
       { name:'Mails', text:'Newsletter prüfen und abhaken', befehl:'/email-aufraeumen', zeichen:'🧹' } ] }
   ];
@@ -67,14 +68,41 @@
     else { zeigeMeldung('Befehl: ' + a.befehl); }
   }
   function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  var CLIENT_ID = '219754550462-vt5vhfp4cqmrontb4j4prq7tljphvh23.apps.googleusercontent.com';
+  var token = null, tokenBis = 0, tclient = null;
+  function holeToken(fertig, fehler) {
+    if (token && Date.now() < tokenBis) { fertig(token); return; }
+    if (!window.google || !google.accounts) { fehler('Google-Anmeldung nicht geladen. Bitte Verbindung prüfen.'); return; }
+    tclient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID, scope: 'https://www.googleapis.com/auth/drive.readonly',
+      callback: function (r) { if (r.access_token) { token = r.access_token; tokenBis = Date.now() + (r.expires_in - 60) * 1000; fertig(token); } else { fehler('Anmeldung nicht möglich.'); } },
+      error_callback: function () { fehler('Anmeldung abgebrochen.'); }
+    });
+    tclient.requestAccessToken();
+  }
+  function drive(pfad, t, text) {
+    return fetch('https://www.googleapis.com/drive/v3/' + pfad, { headers: { Authorization: 'Bearer ' + t } }).then(function (r) { if (!r.ok) { throw new Error('Drive ' + r.status); } return text ? r.text() : r.json(); });
+  }
   function ansehen(a) {
     var an = document.getElementById('ansicht'), tx = document.getElementById('atext');
-    document.getElementById('atitel').textContent = a.name; tx.textContent = 'Lade ...'; an.style.display = 'flex';
-    fetch(a.ansehen + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) { throw 0; } return r.text(); }).then(function (t) {
-      tx.innerHTML = esc(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
-    }, function () { tx.textContent = 'Noch nichts vorhanden oder keine Verbindung.'; });
-  }
-  document.getElementById('azu').onclick = function () { document.getElementById('ansicht').style.display = 'none'; };
+    document.getElementById('atitel').textContent = a.name; tx.textContent = 'Anmelden bei Google ...'; an.style.display = 'flex';
+    var zeigFehler = function (m) { tx.textContent = m; };
+    holeToken(function (t) {
+      tx.textContent = 'Lade ...';
+      var q = encodeURIComponent("name='" + a.drive + "' and mimeType='application/vnd.google-apps.folder' and trashed=false");
+      drive('files?q=' + q + '&fields=files(id)', t).then(function (o) {
+        if (!o.files.length) { throw new Error('Ordner ' + a.drive + ' nicht gefunden'); }
+        var q2 = encodeURIComponent("'" + o.files[0].id + "' in parents and trashed=false");
+        return drive('files?q=' + q2 + '&orderBy=name desc&pageSize=1&fields=files(id,name)', t);
+      }).then(function (o) {
+        if (!o.files.length) { throw new Error('Noch keine Datei im Ordner'); }
+        document.getElementById('atitel').textContent = a.name + ' · ' + o.files[0].name.replace(/\.md$/, '');
+        return drive('files/' + o.files[0].id + '?alt=media', t, true);
+      }).then(function (txt) {
+        tx.innerHTML = esc(txt).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+      }).catch(function (e) { zeigFehler('Fehler: ' + e.message); });
+    }, zeigFehler);
+  }  document.getElementById('azu').onclick = function () { document.getElementById('ansicht').style.display = 'none'; };
   AGENTEN.forEach(function (b) {
     var box = document.createElement('div'); box.className = 'bereich';
     var kopf = document.createElement('button');
