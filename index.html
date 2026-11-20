@@ -46,7 +46,7 @@
 <body>
 <main>
   <div class="kopf"><img class="k" src="kachel-k.png" alt=""><img class="z" src="drei-zeichen.png" alt=""></div>
-  <h1>Meine Agenten</h1>
+  <h1>Meine Agenten <small style="font-weight:400;font-size:12px;color:#8A6D72">v4</small></h1>
   <div id="liste"></div>
 </main>
 <div id="ansicht"><div class="leiste"><b id="atitel"></b><button id="azu">Schließen</button></div><pre id="atext"></pre></div>
@@ -90,7 +90,7 @@
     kopf.onclick = function () { var zu = box.classList.toggle('zu'); kopf.querySelector('.pf').textContent = zu ? '▼' : '▲'; };
     box.appendChild(kopf); box.appendChild(inh); liste.appendChild(box);
   });
-  if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); }); }
+  if ('serviceWorker' in navigator) { var erst = !navigator.serviceWorker.controller; navigator.serviceWorker.addEventListener('controllerchange', function () { if (!erst) { location.reload(); } erst = false; }); window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); }); }
 </script>
 </body>
 </html>
