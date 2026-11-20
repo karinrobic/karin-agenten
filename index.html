@@ -33,6 +33,12 @@
   .punkt { width:9px; height:9px; border-radius:50%; background:#4CC38A; flex:none; } .punkt.aus { background:#C8C2D6; }
   .zeile .tx { flex:1; } .zeile .tx b { font-size:15px; } .zeile .tx span { display:block; font-size:12.5px; color:var(--leise); }
   .starten { background:var(--rot); color:#fff; border:0; border-radius:8px; padding:9px 14px; font-weight:600; font-size:14px; }
+  .ansehen { background:#fff; color:var(--rot); border:1px solid var(--rot); border-radius:8px; padding:8px 12px; font-weight:600; font-size:14px; margin-right:6px; }
+  #ansicht { position:fixed; inset:0; background:#fff; z-index:5; display:none; flex-direction:column; }
+  #ansicht .leiste { display:flex; justify-content:space-between; align-items:center; padding:max(12px, env(safe-area-inset-top)) 16px 10px; border-bottom:1px solid var(--linie); }
+  #ansicht .leiste button { background:var(--rot); color:#fff; border:0; border-radius:8px; padding:8px 14px; font-weight:600; }
+  #ansicht pre { margin:0; padding:14px 16px max(20px, env(safe-area-inset-bottom)); white-space:pre-wrap; word-break:break-word; font:inherit; font-size:15px; line-height:1.5; overflow:auto; flex:1; }
+  #ansicht a { color:var(--rot); }
   #meldung { position:fixed; left:18px; right:18px; bottom:max(18px, env(safe-area-inset-bottom)); background:#3A2428; color:#fff;
     border-radius:12px; padding:12px 14px; font-size:14px; display:none; max-width:484px; margin:0 auto; }
 </style>
@@ -43,12 +49,13 @@
   <h1>Meine Agenten</h1>
   <div id="liste"></div>
 </main>
+<div id="ansicht"><div class="leiste"><b id="atitel"></b><button id="azu">Schließen</button></div><pre id="atext"></pre></div>
 <div id="meldung"></div>
 <script>
   var AGENTEN = [
     { name:'PA', text:'Dein persönlicher Assistent', zeichen:'✦', unter:[
       { name:'Morgen-Briefing', text:'Mails, Termine und offene Themen', befehl:'/offene-themen', zeichen:'☀' },
-      { name:'KI-News', text:'Die täglichen Top 10 mit Links', zeichen:'📰' } ] },
+      { name:'KI-News', text:'Die täglichen Top 10 mit Links', ansehen:'news/aktuell.md', zeichen:'📰' } ] },
     { name:'Kommunikation', text:'Mails und Nachrichten', zeichen:'✉', unter:[
       { name:'Mails', text:'Newsletter prüfen und abhaken', befehl:'/email-aufraeumen', zeichen:'🧹' } ] }
   ];
@@ -59,6 +66,15 @@
     if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(a.befehl).then(fertig, function () { zeigeMeldung('Befehl: ' + a.befehl); }); }
     else { zeigeMeldung('Befehl: ' + a.befehl); }
   }
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function ansehen(a) {
+    var an = document.getElementById('ansicht'), tx = document.getElementById('atext');
+    document.getElementById('atitel').textContent = a.name; tx.textContent = 'Lade ...'; an.style.display = 'flex';
+    fetch(a.ansehen + '?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { if (!r.ok) { throw 0; } return r.text(); }).then(function (t) {
+      tx.innerHTML = esc(t).replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+    }, function () { tx.textContent = 'Noch nichts vorhanden oder keine Verbindung.'; });
+  }
+  document.getElementById('azu').onclick = function () { document.getElementById('ansicht').style.display = 'none'; };
   AGENTEN.forEach(function (b) {
     var box = document.createElement('div'); box.className = 'bereich';
     var kopf = document.createElement('button');
@@ -67,6 +83,7 @@
     b.unter.forEach(function (a) {
       var z = document.createElement('div'); z.className = 'zeile';
       z.innerHTML = '<div class="punkt' + (a.befehl ? '' : ' aus') + '"></div><div class="tx"><b>' + a.zeichen + '  ' + a.name + '</b><span>' + a.text + '</span></div>';
+      if (a.ansehen) { var s = document.createElement('button'); s.className = 'ansehen'; s.textContent = 'Ansehen'; s.onclick = function () { ansehen(a); }; z.appendChild(s); }
       if (a.befehl) { var k = document.createElement('button'); k.className = 'starten'; k.textContent = '▶ Starten'; k.onclick = function () { starten(a); }; z.appendChild(k); }
       inh.appendChild(z);
     });
