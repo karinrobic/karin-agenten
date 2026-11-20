@@ -12,7 +12,7 @@
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
-  :root { --rot:#D7362A; --text:#3A2428; --leise:#8A6D72; --linie:#F3D5D8; }
+  :root { --rot:#D7362A; --text:#3A2428; --leise:#6B4E55; --linie:#F3D5D8; }
   * { box-sizing: border-box; }
   body { margin:0; font-family: "Segoe UI", system-ui, sans-serif; color:var(--text);
     background: linear-gradient(135deg,#FBDDE0 0%,#FFF8F8 55%,#F1E8FB 100%) fixed; min-height:100vh;
@@ -46,7 +46,7 @@
 <body>
 <main>
   <div class="kopf"><img class="k" src="kachel-k.png" alt=""><img class="z" src="drei-zeichen.png" alt=""></div>
-  <h1>Meine Agenten <small style="font-weight:400;font-size:12px;color:#8A6D72">v5</small></h1>
+  <h1>Meine Agenten <small style="font-weight:400;font-size:12px;color:#6B4E55">v6</small></h1>
   <div id="liste"></div>
 </main>
 <div id="ansicht"><div class="leiste"><b id="atitel"></b><button id="azu">Schließen</button></div><pre id="atext"></pre></div>
@@ -55,7 +55,7 @@
 <script>
   var AGENTEN = [
     { name:'PA', text:'Dein persönlicher Assistent', zeichen:'✦', unter:[
-      { name:'Morgen-Briefing', text:'Mails, Termine und offene Themen', befehl:'/offene-themen', ansehen:true, drive:'Morgen-Briefing', zeichen:'☀' },
+      { name:'Morgen-Briefing', text:'Mails, Termine und offene Themen', befehl:'/offene-themen', ansehen:true, drive:'Meine Agenten/Morgen-Briefing', zeichen:'☀' },
       { name:'KI-News', text:'Die täglichen Top 10 mit Links', ansehen:true, drive:'KI-News', zeichen:'📰' } ] },
     { name:'Kommunikation', text:'Mails und Nachrichten', zeichen:'✉', unter:[
       { name:'Mails', text:'Newsletter prüfen und abhaken', befehl:'/email-aufraeumen', zeichen:'🧹' } ] }
@@ -89,10 +89,17 @@
     var zeigFehler = function (m) { tx.textContent = m; };
     holeToken(function (t) {
       tx.textContent = 'Lade ...';
-      var q = encodeURIComponent("name='" + a.drive + "' and mimeType='application/vnd.google-apps.folder' and trashed=false");
-      drive('files?q=' + q + '&fields=files(id)', t).then(function (o) {
-        if (!o.files.length) { throw new Error('Ordner ' + a.drive + ' nicht gefunden'); }
-        var q2 = encodeURIComponent("'" + o.files[0].id + "' in parents and trashed=false");
+      var teile = a.drive.split('/'), elter = null;
+      var suche = function (i) {
+        var qs = "name='" + teile[i] + "' and mimeType='application/vnd.google-apps.folder' and trashed=false" + (elter ? " and '" + elter + "' in parents" : '');
+        return drive('files?q=' + encodeURIComponent(qs) + '&fields=files(id)', t).then(function (o) {
+          if (!o.files.length) { throw new Error('Ordner ' + teile[i] + ' nicht gefunden'); }
+          elter = o.files[0].id;
+          return i + 1 < teile.length ? suche(i + 1) : elter;
+        });
+      };
+      suche(0).then(function (id) {
+        var q2 = encodeURIComponent("'" + id + "' in parents and trashed=false");
         return drive('files?q=' + q2 + '&orderBy=name desc&pageSize=1&fields=files(id,name)', t);
       }).then(function (o) {
         if (!o.files.length) { throw new Error('Noch keine Datei im Ordner'); }
